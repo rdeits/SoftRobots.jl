@@ -1,6 +1,7 @@
 module SoftRobots
 
-using MultiPoly
+using SpatialFields 
+import MultiPoly: MPoly
 import PyPlot
 import DataStructures: OrderedDict
 
@@ -23,7 +24,6 @@ end
 type Spine
     parent::Int
     child::Int
-    length::Float64
 end
 
 type SoftRobot <: DynamicObject
@@ -57,20 +57,24 @@ abstract StaticObjectState <: ObjectState
 
 WorldState = Dict{Object, ObjectState}
 
-type SoftRobotState <: DynamicObjectState
-    positions::Array{Array{Float64,1},1}
-    velocities::Array{Array{Float64,1},1}
-    barrier
-    velocity_field::Array{Polynomial, 1}
+type SoftRobotState{T} <: DynamicObjectState
+    positions::Vector{Vector{T}}
+    velocities::Vector{Vector{T}}
+    barrier::ScalarField
+    velocity_field::VectorField
 
     SoftRobotState(positions, velocities) = new(positions, velocities)
 end
 
-type FixedObjectState <: StaticObjectState
-    barrier
-    velocity_field::Array{Polynomial, 1}
+function SoftRobotState{T}(positions::Vector{Vector{T}}, velocities::Vector{Vector{T}})
+	SoftRobotState{T}(positions, velocities)
+end
 
-    FixedObjectState(barrier) = new(barrier, [Polynomial(OrderedDict(zeros(Int64, length(barrier.vars)) => 0.0), barrier.vars), Polynomial(OrderedDict(zeros(Int64, length(barrier.vars)) => 0.0), barrier.vars)])
+type FixedObjectState <: StaticObjectState
+    barrier::ScalarField
+    velocity_field::VectorField
+
+    FixedObjectState(barrier) = new(barrier, [MPoly{Float64}(OrderedDict(zeros(Int64, length(barrier.vars)) => 0.0), barrier.vars), MPoly{Float64}(OrderedDict(zeros(Int64, length(barrier.vars)) => 0.0), barrier.vars)])
 end
 
 function update!(world::World, states::Dict{Object, ObjectState}, dt::Number)
@@ -102,24 +106,24 @@ function dynamics!(object::FixedObject, args...)
     # Nothing to do here
 end
 
-# function update_barrier!(r::SoftRobot, state::SoftRobotState)
-#     state.barrier = barrier_function(state.positions, [], 2)
-# end 
-
-function update_barrier!(robot::SoftRobot, state::SoftRobotState)
-    points = vcat([state.positions[s.parent]' for s in robot.spines]...)
-    normals = vcat([state.positions[s.parent]' - state.positions[s.child]' for s in robot.spines]...)
-    for i = 1:size(normals, 1)
-        normals[i,:] = normals[i,:] / norm(normals[i,:])
-    end
-    state.barrier = get_field(points, normals)
+function normalize!(x)
+	x /= norm(x)
 end
 
-function update_velocity_field!(robot::SoftRobot, state::SoftRobotState)
+function update_barrier!(robot::SoftRobot, state::SoftRobotState)
+    points = hcat([state.positions[s.parent] for s in robot.spines]...)
+    normals = hcat([state.positions[s.parent] - state.positions[s.child] for s in robot.spines]...)
+    for i = 1:size(normals, 1)
+        normalize!(normals[i,:])
+    end
+    state.barrier = HermiteRadialField(points, normals)
+end
+
+function update_velocity_field!{T}(robot::SoftRobot, state::SoftRobotState{T})
     mean_velocity = mean(state.velocities)
     # TODO: linear regression on velocity as a function of [x, y]
     dimension = length(state.positions[1])
-    state.velocity_field = [Polynomial(OrderedDict([0, 0] => v), [:x, :y, :z][1:dimension]) for v in mean_velocity]
+    state.velocity_field = PolynomialVectorField([MPoly{T}(OrderedDict([0, 0] => v), [:x, :y, :z][1:dimension]) for v in mean_velocity])
 end
 
 function collisions!(robot::SoftRobot, states::Dict{Object, ObjectState}, friction::Number, dt::Number)
@@ -146,19 +150,18 @@ function rotmat(theta)
 end
 
 function barrier_collisions!(robot::SoftRobot, my_state::SoftRobotState, other_state::ObjectState, friction::Number, dt::Number)
-    barrier_graident = ForwardDiff.gradient(x -> other_state.barrier(x...))
-    # barrier_graident = [derivative(other_state.barrier, x) for x in other_state.barrier.vars]
+	barrier_graident = grad(other_state.barrier)
     for i = 1:length(robot.nodes)
-        relative_velocity = my_state.velocities[i] - other_state.velocity_field(my_state.positions[i]...)
+        relative_velocity = my_state.velocities[i] - evaluate(other_state.velocity_field, my_state.positions[i])
         predicted_relative_position = my_state.positions[i] + relative_velocity * dt
-        if other_state.barrier(predicted_relative_position...) <= 0
+        if evaluate(other_state.barrier, predicted_relative_position) <= 0
             # println("collision with barrier: " , other_state.barrier)
             # @show my_state.velocities[i]
             # @show my_state.positions[i]
             # @show relative_velocity
             # @show predicted_relative_position
             # @show value(other_state.barrier, predicted_relative_position...)
-            gradient = barrier_graident(predicted_relative_position)
+            gradient = evaluate(barrier_graident, predicted_relative_position)
             normal = gradient / norm(gradient)
             penetration_velocity = -dot(relative_velocity, normal)
             if penetration_velocity > 0
@@ -174,12 +177,12 @@ function barrier_collisions!(robot::SoftRobot, my_state::SoftRobotState, other_s
     end
 end
 
-function update_internal_forces!(robot::SoftRobot, state::SoftRobotState, total_forces)
+function update_internal_forces!{T}(robot::SoftRobot, state::SoftRobotState{T}, total_forces)
     dim = length(total_forces[1])
-    displacement = Array(Float64, dim)
-    direction = Array(Float64, dim)
-    relative_velocity = Array(Float64, dim)
-    force = Array(Float64, dim)
+    displacement = Array{T}(dim)
+    direction = Array{T}(dim)
+    relative_velocity = Array{T}(dim)
+    force = Array{T}(dim)
     distance = 0.
     edge_velocity = 0.
     force = 0.
@@ -201,7 +204,7 @@ function update_internal_forces!(robot::SoftRobot, state::SoftRobotState, total_
     end
 end
 
-function euler_integrate!(robot::SoftRobot, state::SoftRobotState, total_forces, dt::Float64)
+function euler_integrate!(robot::SoftRobot, state::SoftRobotState, total_forces, dt::Real)
     dim = length(state.positions[1])
     for i = 1:length(robot.nodes)
         for j = 1:dim
@@ -245,8 +248,8 @@ function snake()
     edges = [DampedSpring(x, y, k, b, l) for (x, y) in Any[[1,2], [1,3], [1,4]]]
     x = 0.4
     y = 0.8
-    positions = Array{Float64}[[x, y]]
-    spines = [Spine(1, 3, l/2)]
+    positions = Array{Float64, 1}[[x, y]]
+    spines = [Spine(1, 3)]
     rows = 8
     for row = 1:8
         x += l
@@ -257,8 +260,8 @@ function snake()
         for i = 1:2
             push!(edges, DampedSpring(1 + i + (row-1) * 3, i + 2 + (row-1) * 3, k, b, l))
         end
-        push!(spines, Spine(2 + (row-1) * 3, 3 + (row-1) * 3, l/2))
-        push!(spines, Spine(4 + (row-1) * 3, 3 + (row-1) * 3, l/2))
+        push!(spines, Spine(2 + (row-1) * 3, 3 + (row-1) * 3))
+        push!(spines, Spine(4 + (row-1) * 3, 3 + (row-1) * 3))
         if row != rows
             for i = 1:3
                 push!(edges, DampedSpring(1 + i + (row-1) * 3, 1 + i + (row) * 3, k, b, l))
@@ -272,7 +275,7 @@ function snake()
     x += l
     push!(nodes, PointMass(m))
     push!(positions, [x, y])
-    push!(spines, Spine(length(nodes), length(nodes) - 2, l/2))
+    push!(spines, Spine(length(nodes), length(nodes) - 2))
     for i = length(nodes)-3:length(nodes)-1
         push!(edges, DampedSpring(i, length(nodes), k, b, l))
     end
@@ -297,7 +300,7 @@ type Range
     max
 end
 
-function draw(barrier::Union{Polynomial, Function}, variable_ranges::Array{Range, 1}, level=0.0)
+function draw(barrier::ScalarField, variable_ranges::Array{Range, 1}, level=0.0)
     @assert length(variable_ranges) == 2
     X = linspace(variable_ranges[1].min, variable_ranges[1].max)
     Y = linspace(variable_ranges[2].min, variable_ranges[2].max)
@@ -305,7 +308,7 @@ function draw(barrier::Union{Polynomial, Function}, variable_ranges::Array{Range
     Z = zeros(length(Y), length(X))
     for j = 1:length(X)
         for k = 1:length(Y)
-            Z[k,j] = barrier(X[j], Y[k])
+            Z[k,j] = evaluate(barrier, [X[j], Y[k]])
         end
     end
     PyPlot.contour(X, Y, Z, [level, level])
@@ -330,15 +333,5 @@ function draw(states::Dict{Object, ObjectState})
         draw(object, state)
     end
 end
-# convert(::Type{Array{Float64,1}}, p::Point3D) = Float64[p.x, p.y, p.z]
-# convert(::Type{Point3D}, p::Array{Real}) = length(p) == 3 ? Point3D(p...) : throw(InexactError())
-# +(a::Point3D, b::Point3D) = Point3D(a.x + b.x, a.y + b.y, a.z + b.z)
-# -(a::Point3D, b::Point3D) = Point3D(a.x - b.x, a.y - b.y, a.z - b.z)
-# norm(a::Point3D) = sqrt(a.x^2 + a.y^2 + a.z^2)
-# promote_rule(::Type{Point3D}, ::Type{Array{Float64,1}}) = Array{Float64,1}
-# promote_rule(::Type{Point3D}, ::Type{Point3D}) = Array{Float64,1}
-# +(x::Point3D, y::Array{Float64,1}) = +(promote(x,y)...)
-# +(x::Array{Float64,1}, y::Point3D) = +(promote(x,y)...)
-# +(x::Point3D, y::Point3D) = +(promote(x,y)...)
         
 end
