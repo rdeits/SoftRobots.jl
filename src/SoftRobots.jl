@@ -1,9 +1,10 @@
-__precompile__()
+VERSION >= v"0.4" && __precompile__()
 
 module SoftRobots
 
 using SpatialFields 
 import MultiPoly: MPoly
+import PyCall
 import PyPlot
 import DataStructures: OrderedDict
 
@@ -57,7 +58,7 @@ abstract ObjectState
 abstract DynamicObjectState <: ObjectState
 abstract StaticObjectState <: ObjectState
 
-WorldState = Dict{Object, ObjectState}
+typealias WorldState Dict{Object, ObjectState}
 
 type SoftRobotState{T} <: DynamicObjectState
     positions::Vector{Vector{T}}
@@ -297,43 +298,45 @@ function snake()
     r, state
 end
 
-type Range
-    min
-    max
-end
+include("pyplot_visualizer.jl")
 
-function draw(barrier::ScalarField, variable_ranges::Array{Range, 1}, level=0.0)
-    @assert length(variable_ranges) == 2
-    X = linspace(variable_ranges[1].min, variable_ranges[1].max)
-    Y = linspace(variable_ranges[2].min, variable_ranges[2].max)
+# type Range
+#     min
+#     max
+# end
+
+# function draw(barrier::ScalarField, variable_ranges::Array{Range, 1}, level=0.0)
+#     @assert length(variable_ranges) == 2
+#     X = linspace(variable_ranges[1].min, variable_ranges[1].max)
+#     Y = linspace(variable_ranges[2].min, variable_ranges[2].max)
     
-    Z = zeros(length(Y), length(X))
-    for j = 1:length(X)
-        for k = 1:length(Y)
-            Z[k,j] = evaluate(barrier, [X[j], Y[k]])
-        end
-    end
-    PyPlot.contour(X, Y, Z, [level, level])
-end
+#     Z = zeros(length(Y), length(X))
+#     for j = 1:length(X)
+#         for k = 1:length(Y)
+#             Z[k,j] = evaluate(barrier, [X[j], Y[k]])
+#         end
+#     end
+#     PyPlot.contour(X, Y, Z, [level, level])
+# end
 
-function draw(snake::SoftRobot, state::SoftRobotState)
-    draw(state.barrier, [Range(0,1), Range(0,1)])
+# function draw(snake::SoftRobot, state::SoftRobotState)
+#     draw(state.barrier, [Range(0,1), Range(0,1)])
     
-    for edge in snake.edges
-        p1 = state.positions[edge.parent]
-        p2 = state.positions[edge.child]
-        PyPlot.plot([p1[1], p2[1]], [p1[2], p2[2]], "bo-")
-    end
-end
+#     for edge in snake.edges
+#         p1 = state.positions[edge.parent]
+#         p2 = state.positions[edge.child]
+#         PyPlot.plot([p1[1], p2[1]], [p1[2], p2[2]], "bo-")
+#     end
+# end
 
-function draw(object::FixedObject, state::FixedObjectState)
-    draw(state.barrier, [Range(0,1), Range(0,1)])
-end
+# function draw(object::FixedObject, state::FixedObjectState)
+#     draw(state.barrier, [Range(0,1), Range(0,1)])
+# end
 
-function draw(states::Dict{Object, ObjectState})
-    for (object, state) in states
-        draw(object, state)
-    end
-end
+# function draw(states::Dict{Object, ObjectState})
+#     for (object, state) in states
+#         draw(object, state)
+#     end
+# end
         
 end
