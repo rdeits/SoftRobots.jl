@@ -22,11 +22,10 @@ function test_snake()
     PyPlot.ion()
 
     for j = 1:1000
-        if mod(j, 10) == 0
+        if mod(j, 100) == 0
             SoftRobots.draw(vis, world_state)
             xlim([0,1])
             ylim([0,1])
-            PyPlot.draw()
         end
         SoftRobots.update!(world, world_state, 0.001)
     end

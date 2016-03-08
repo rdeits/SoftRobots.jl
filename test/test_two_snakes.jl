@@ -27,16 +27,15 @@ function test_two_snakes()
     push!(world.objects, terrain)
     world_state[terrain] = terrain_state
 
+    vis = SoftRobots.PyPlotVisualizer(world)
+
     history = typeof(world_state)[]
 
     function playback(history::Array{SoftRobots.WorldState}, dt=1)
         for i = 1:dt:length(history)
-            PyPlot.cla()
-            PyPlot.hold(true)
-            SoftRobots.draw(history[i])
+            SoftRobots.draw(vis, history[i])
             xlim([0,1])
             ylim([0,1])
-            PyPlot.hold(false)
             PyPlot.draw()
         end
     end
@@ -48,13 +47,9 @@ function test_two_snakes()
         SoftRobots.update!(world, world_state, 0.001)
         push!(history, deepcopy(world_state))
         if mod(j, 100) == 0
-            PyPlot.cla()
-            PyPlot.hold(true)
-            SoftRobots.draw(world_state)
+            SoftRobots.draw(vis, world_state)
             xlim([0,1])
             ylim([0,1])
-            PyPlot.hold(false)
-            PyPlot.draw()
         end
     end
 

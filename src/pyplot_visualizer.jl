@@ -35,6 +35,7 @@ function draw(vis::PyPlotVisualizer, state::WorldState)
 	for object in vis.world.objects
 		draw(vis, object, state[object])
 	end
+	PyPlot.draw()
 end
 
 function draw(vis::PyPlotVisualizer, object::StaticObject, state::StaticObjectState)
