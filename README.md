@@ -1,0 +1,3 @@
+# SoftRobots
+
+[![Build Status](https://travis-ci.org/rdeits/SoftRobots.jl.svg?branch=master)](https://travis-ci.org/rdeits/SoftRobots.jl)
