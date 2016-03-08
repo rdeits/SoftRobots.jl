@@ -19,8 +19,8 @@ function test_snake()
 	pygui(true)
 	PyPlot.ion()
 
-	for j = 1:2000
-	    if mod(j, 5) == 0
+	for j = 1:1000
+	    if mod(j, 100) == 0
 	    	cla()
 	        SoftRobots.draw(world_state)
 	        xlim([0,1])
