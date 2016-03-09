@@ -2,7 +2,7 @@ VERSION >= v"0.4" && __precompile__()
 
 module SoftRobots
 
-using SpatialFields 
+using SpatialFields
 import MultiPoly: MPoly
 import PyCall
 import PyPlot
@@ -110,7 +110,10 @@ function dynamics!(object::FixedObject, args...)
 end
 
 function normalize!(x)
-	x /= norm(x)
+    n = norm(x)
+    @inbounds @simd for i = 1:length(x)
+        x[i] /= n
+    end
 end
 
 function update_barrier!(robot::SoftRobot, state::SoftRobotState)
@@ -285,8 +288,8 @@ function snake()
 
 
 
-    # edges = Any[[1,2], [1,3], [2,3], [4,5], [6,7], [8,9], 
-    #             [8,10], [9,10], [2,4], [3,5], [4,6], 
+    # edges = Any[[1,2], [1,3], [2,3], [4,5], [6,7], [8,9],
+    #             [8,10], [9,10], [2,4], [3,5], [4,6],
     #     [5,7], [6,8], [7,9], [3,4], [5,6], [7,8],
     #     [2,5], [4,7], [6,9]]
     # edges = [DampedSpring(e[1], e[2], 2000.0, 4.0, 0.05) for e in edges]
@@ -309,7 +312,7 @@ include("pyplot_visualizer.jl")
 #     @assert length(variable_ranges) == 2
 #     X = linspace(variable_ranges[1].min, variable_ranges[1].max)
 #     Y = linspace(variable_ranges[2].min, variable_ranges[2].max)
-    
+
 #     Z = zeros(length(Y), length(X))
 #     for j = 1:length(X)
 #         for k = 1:length(Y)
@@ -321,7 +324,7 @@ include("pyplot_visualizer.jl")
 
 # function draw(snake::SoftRobot, state::SoftRobotState)
 #     draw(state.barrier, [Range(0,1), Range(0,1)])
-    
+
 #     for edge in snake.edges
 #         p1 = state.positions[edge.parent]
 #         p2 = state.positions[edge.child]
@@ -338,5 +341,5 @@ include("pyplot_visualizer.jl")
 #         draw(object, state)
 #     end
 # end
-        
+
 end
