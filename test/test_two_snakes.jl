@@ -2,6 +2,10 @@ using SoftRobots
 using PyPlot
 using MultiPoly
 
+function copy_dict_values(dict::Dict)
+    Dict(zip(keys(dict), deepcopy(values(dict))))
+end
+
 function test_two_snakes()
 
     world = SoftRobots.World2D()
@@ -45,7 +49,7 @@ function test_two_snakes()
 
     for j = 0:2000
         SoftRobots.update!(world, world_state, 0.001)
-        push!(history, deepcopy(world_state))
+        push!(history, copy_dict_values(world_state))
         if mod(j, 100) == 0
             SoftRobots.draw(vis, world_state)
             xlim([0,1])
