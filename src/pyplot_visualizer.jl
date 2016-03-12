@@ -21,14 +21,14 @@ function PyPlotVisualizer(world::World)
 	PyPlotVisualizer(world, fig, ax, actors, drawn_static_objects)
 end
 
-construct_actors(ax, object::StaticObject) = Actors([], ax[:contour](zeros(25, 25), [0.0, 0.0]))
+construct_actors(ax, object::StaticObject) = Actors([], ax[:contour](zeros(25, 25), [0.0]))
 
 function construct_actors(ax, object::SoftRobot)
 	edge_actors = []
 	for edge in object.edges
 		push!(edge_actors, ax[:plot]([0,0], [0,0], "bo-"))
 	end
-	Actors(edge_actors, ax[:contour](zeros(25, 25), [0.0, 0.0]))
+	Actors(edge_actors, ax[:contour](zeros(25, 25), [0.0]))
 end
 
 function draw(vis::PyPlotVisualizer, state::WorldState)
@@ -61,7 +61,7 @@ function draw(actor, barrier::ScalarField, variable_ranges::Array{Range, 1}, lev
     @assert length(variable_ranges) == 2
     X = linspace(variable_ranges[1].min, variable_ranges[1].max, 25)
     Y = linspace(variable_ranges[2].min, variable_ranges[2].max, 25)
-    
+
     Z = zeros(length(Y), length(X))
     for j = 1:length(X)
         for k = 1:length(Y)
@@ -80,4 +80,3 @@ function draw(actors::Actors, robot::SoftRobot, state::SoftRobotState)
 		actors.edges[i][1][:set_ydata]([state.positions[edge.parent][2], state.positions[edge.child][2]])
 	end
 end
-

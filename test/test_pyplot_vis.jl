@@ -1,6 +1,5 @@
 using SoftRobots
 using MultiPoly
-using ProfileView
 
 function test_snake()
     world = SoftRobots.World2D()
@@ -16,12 +15,20 @@ function test_snake()
     push!(world.objects, terrain)
     world_state[terrain] = terrain_state
 
-    Profile.clear()
+    vis = SoftRobots.PyPlotVisualizer(world)
+
+    pygui(true)
+    PyPlot.ion()
+
     SoftRobots.update!(world, world_state, 0.001)
-    @time @profile for j = 1:1000
+    for j = 1:1000
+        if mod(j, 100) == 0
+            SoftRobots.draw(vis, world_state)
+            xlim([0,1])
+            ylim([0,1])
+        end
         SoftRobots.update!(world, world_state, 0.001)
     end
-    ProfileView.view()
 end
 
 test_snake()

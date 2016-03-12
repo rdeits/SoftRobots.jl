@@ -5,7 +5,7 @@ module SoftRobots
 using SpatialFields
 import MultiPoly: MPoly
 import PyCall
-import PyPlot
+# import PyPlot
 import DataStructures: OrderedDict
 
 abstract Object
@@ -301,7 +301,7 @@ function snake()
     r, state
 end
 
-include("pyplot_visualizer.jl")
+# include("pyplot_visualizer.jl")
 
 # type Range
 #     min
