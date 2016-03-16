@@ -4,6 +4,7 @@ module SoftRobots
 
 using SpatialFields
 import MultiPoly: MPoly
+using Meshing
 using GeometryTypes
 import DataStructures: OrderedDict
 using PyCall
@@ -30,10 +31,14 @@ type PointMass
     mass::Float64
 end
 
-type SoftRobot <: DynamicObject
+type SoftRobot{T, IndexOffset} <: DynamicObject
     nodes::Vector{PointMass}
     edges::Vector{DampedSpring}
-    faces::Vector{Face{3}}
+    faces::Vector{Face{3, T, IndexOffset}}
+end
+
+function SoftRobot{T, IndexOffset}(nodes::Vector{PointMass}, edges::Vector{DampedSpring}, faces::Vector{Face{3, T, IndexOffset}})
+  SoftRobot{T, IndexOffset}(nodes, edges, faces)
 end
 
 immutable FixedObject <: StaticObject
@@ -117,13 +122,10 @@ function normalize!(x)
     end
 end
 
-function update_barrier!(robot::SoftRobot, state::SoftRobotState)
-    # points = hcat([state.positions[s.parent] for s in robot.spines]...)
-    # normals = hcat([state.positions[s.parent] - state.positions[s.child] for s in robot.spines]...)
-    # for i = 1:size(normals, 1)
-    #     normalize!(normals[i,:])
-    # end
-    # state.barrier = HermiteRadialField(points, normals)
+function update_barrier!{T}(robot::SoftRobot, state::SoftRobotState{T})
+    mesh = HomogenousMesh(state.positions, robot.faces)
+    normals = decompose(GeometryTypes.Normal{3, T}, mesh)
+    state.barrier = HermiteRadialField(state.positions, normals)
 end
 
 function update_velocity_field!{T}(robot::SoftRobot, state::SoftRobotState{T})
@@ -173,7 +175,7 @@ function barrier_collisions!{T}(robot::SoftRobot, my_state::SoftRobotState{T}, o
             # @show penetration_velocity
             if penetration_velocity > 0
                 # my_state.velocities[i] += normal * penetration_velocity
-                my_state.velocities[i] = barrier_velocity
+                my_state.velocities[i] = Point(barrier_velocity)
             end
             # @show my_state.velocities[i]
             # gradient = rotmat(friction * pi*(rand(1) - 0.5)) * gradient
@@ -249,10 +251,10 @@ end
 # 1 3 6 9
 #   4 7 10
 
-function convex_hull(nodes)
+function convex_hull{T}(nodes::Vector{Point{3, T}})
     hull = spatial[:ConvexHull](hcat(map(x -> convert(Vector, x), nodes)...)')
     simplices = hull[:simplices]
-    return [Face((simplices[i,:]+1)...) for i in 1:size(simplices, 1)]
+    return Face{3, Int, 0}[vec(simplices[i,:]+1) for i in 1:size(simplices, 1)]
 end
 
 function tetrahedron()
@@ -345,40 +347,81 @@ function snake()
     robot, state
 end
 
-function mesh{T}(robot::SoftRobot, state::SoftRobotState{T})
-    HomogenousMesh(state.positions, robot.faces)
+# function mesh{T}(robot::SoftRobot, state::SoftRobotState{T})
+#     HomogenousMesh(state.positions, robot.faces)
+# end
+
+function draw(lcmgl::LCMGLClient, mesh::AbstractMesh; face_color=[.7, .7, .2, .4])
+    color(lcmgl, face_color...)
+    begin_mode(lcmgl, LCMGL.TRIANGLES)
+    verts = vertices(mesh)
+    for face in faces(mesh)
+        for point in verts[face][end:-1:1]
+            vertex(lcmgl, point[1], point[2], point[3])
+        end
+    end
+    end_mode(lcmgl)
+    color(lcmgl, 0., 0., 0., 1.0)
+    begin_mode(lcmgl, LCMGL.LINES)
+    for face in faces(mesh)
+        for i = 1:length(verts[face])
+            vertex(lcmgl, verts[face][i]...)
+            j = i + 1
+            if i == length(verts[face])
+                j = 1
+            end
+            vertex(lcmgl, verts[face][j]...)
+        end
+    end
+    normals = decompose(Normal{3, Float64}, mesh)
+    for i = 1:length(verts)
+      vertex(lcmgl, verts[i]...)
+      vertex(lcmgl, (verts[i] + Point(normals[i]) * 0.05)...)
+    end
+    end_mode(lcmgl)
+    # switch_buffer(lcmgl)
 end
 
 function draw(mesh::AbstractMesh)
     LCMGLClient("soft_robot") do lcmgl
-        color(lcmgl, .7, .7, .2, 0.4)
-        begin_mode(lcmgl, LCMGL.TRIANGLES)
-        verts = vertices(mesh)
-        for face in faces(mesh)
-            for point in verts[face][end:-1:1]
-                vertex(lcmgl, point[1], point[2], point[3])
-            end
-        end
-        end_mode(lcmgl)
-        color(lcmgl, 0., 0., 0., 1.0)
-        begin_mode(lcmgl, LCMGL.LINES)
-        verts = vertices(mesh)
-        for face in faces(mesh)
-            for i = 1:length(verts[face])
-                vertex(lcmgl, verts[face][i]...)
-                j = i + 1
-                if i == length(verts[face])
-                    j = 1
-                end
-                vertex(lcmgl, verts[face][j]...)
-            end
-        end
-        end_mode(lcmgl)
-        switch_buffer(lcmgl)
+      draw(lcmgl, mesh)
+      switch_buffer(lcmgl)
     end
 end
 
-draw(robot::SoftRobot, state::SoftRobotState) = draw(mesh(robot, state))
+function draw(robot::SoftRobot, state::SoftRobotState)
+  LCMGLClient("soft_robot") do lcmgl
+    draw(lcmgl, robot, state)
+    switch_buffer(lcmgl)
+  end
+end
+
+function draw(lcmgl::LCMGLClient, robot::SoftRobot, state::SoftRobotState)
+  body_mesh = HomogenousMesh(state.positions, robot.faces)
+  draw(lcmgl, body_mesh)
+
+  # boundary_mesh = HomogenousMesh(SignedDistanceField(x -> evaluate(state.barrier, x), HyperRectangle(Vec(0., 0., 0.), Vec(4., 4, 4))))
+  # draw(lcmgl, boundary_mesh, face_color=[.8, .1, .1, .3])
+  switch_buffer(lcmgl)
+end
+
+function copy_dict_values(dict::Dict)
+    Dict(zip(keys(dict), deepcopy(values(dict))))
+end
+
+function simulate{StateType <: WorldState}(world::World, initial_world_state::StateType, times; draw_callback::Function=draw)
+  state = copy_dict_values(initial_world_state)
+  history = Tuple{Float64, StateType}[]
+  dts = diff(times)
+
+  for i in 2:length(times)
+    SoftRobots.update!(world, state, times[i] - times[i-1])
+    push!(history, (times[i], copy_dict_values(state)))
+    draw_callback(world, state)
+  end
+  history
+end
+
 
 # include("pyplot_visualizer.jl")
 
