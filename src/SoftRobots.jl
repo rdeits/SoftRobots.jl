@@ -216,11 +216,11 @@ end
 function euler_integrate!(robot::SoftRobot, state::SoftRobotState, total_forces, dt::Real)
     dim = length(state.positions[1])
     for i = 1:length(robot.nodes)
-        half_delta_v = Point(total_forces[i]) / robot.nodes[i].mass * dt / 2.0
-        state.velocities[i] += half_delta_v
+        delta_v = Point(total_forces[i]) / robot.nodes[i].mass * dt
+        # state.velocities[i] += half_delta_v
         # state.velocities[i] += Point(total_forces[i]) / robot.nodes[i].mass * dt
         state.positions[i] += state.velocities[i] * dt
-        state.velocities[i] += half_delta_v
+        state.velocities[i] += delta_v
     end
 end
 
