@@ -7,6 +7,7 @@ import MultiPoly: MPoly
 using Meshing
 using GeometryTypes
 import DataStructures: OrderedDict
+import Iterators: product
 using PyCall
 global spatial
 using LCMGL
@@ -135,10 +136,10 @@ function update_barrier!{T}(robot::SoftRobot, state::SoftRobotState{T})
 end
 
 function update_velocity_field!{T}(robot::SoftRobot, state::SoftRobotState{T})
-    mean_velocity = mean(state.velocities)
-    # TODO: linear regression on velocity as a function of [x, y]
-    dimension = length(state.positions[1])
-    state.velocity_field = PolynomialVectorField([MPoly{T}(OrderedDict(zeros(dimension) => v), [:x, :y, :z][1:dimension]) for v in mean_velocity])
+    # mean_velocity = mean(state.velocities)
+    # dimension = length(state.positions[1])
+    # state.velocity_field = PolynomialVectorField([MPoly{T}(OrderedDict(zeros(dimension) => v), [:x, :y, :z][1:dimension]) for v in mean_velocity])
+    state.velocity_field = PolynomialVectorField(SpatialFields.linear_fit(state.positions, state.velocities))
 end
 
 function collisions!(robot::SoftRobot, states::Dict{Object, ObjectState}, friction::Number, dt::Number)
@@ -319,6 +320,26 @@ function blob(;k=4000., b=4.0, m=0.1, num_nodes=20)
     state = SoftRobotState(positions, velocities)
     robot, state
 end
+
+function cube(;k=4000., b=4.0, m=0.1)
+    num_nodes = 8
+    nodes = [PointMass(m) for i in 1:num_nodes]
+    positions = Point{3, Float64}[product([[0.; 1.0] for i = 1:3]...)...]
+    edges = DampedSpring[]
+    for i = 1:num_nodes
+        for j = (i+1):num_nodes
+            rest_length = norm(positions[i] - positions[j])
+            push!(edges, DampedSpring(i, j, k, b, rest_length))
+        end
+    end
+
+    faces = convex_hull(positions)
+    robot = SoftRobot(nodes, edges, faces)
+    velocities = [Point{3, Float64}(0) for n in robot.nodes]
+    state = SoftRobotState(positions, velocities)
+    robot, state
+end
+
 
 function snake()
     k = 4000.0
