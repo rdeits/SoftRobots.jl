@@ -373,7 +373,7 @@ end
 #     HomogenousMesh(state.positions, robot.faces)
 # end
 
-function draw(lcmgl::LCMGLClient, mesh::AbstractMesh; face_color=[.7, .7, .2, .4])
+function draw(lcmgl::LCMGLClient, mesh::AbstractMesh; face_color=[.7, .7, .2, .4], draw_normals=false)
     color(lcmgl, face_color...)
     begin_mode(lcmgl, LCMGL.TRIANGLES)
     verts = vertices(mesh)
@@ -395,13 +395,14 @@ function draw(lcmgl::LCMGLClient, mesh::AbstractMesh; face_color=[.7, .7, .2, .4
             vertex(lcmgl, verts[face][j]...)
         end
     end
-    normals = decompose(Normal{3, Float64}, mesh)
-    for i = 1:length(verts)
-      vertex(lcmgl, verts[i]...)
-      vertex(lcmgl, (verts[i] + Point(normals[i]) * 0.05)...)
+    if draw_normals
+      normals = decompose(Normal{3, Float64}, mesh)
+      for i = 1:length(verts)
+        vertex(lcmgl, verts[i]...)
+        vertex(lcmgl, (verts[i] + Point(normals[i]) * 0.05)...)
+      end
     end
     end_mode(lcmgl)
-    # switch_buffer(lcmgl)
 end
 
 function draw(mesh::AbstractMesh)
@@ -421,9 +422,8 @@ end
 function draw(lcmgl::LCMGLClient, robot::SoftRobot, state::SoftRobotState)
   body_mesh = HomogenousMesh(state.positions, robot.faces)
   draw(lcmgl, body_mesh)
-  switch_buffer(lcmgl)
 
-  LCMGLClient("barrier$(lcmgl.pointer)") do lcmgl
+  LCMGLClient("barrier$(lcmgl.name)") do lcmgl
     center = Vec(mean(state.positions))
     widths = Vec(1.5*(maximum(state.positions) - minimum(state.positions)))
     lb = Vec(center - 0.5*widths)
