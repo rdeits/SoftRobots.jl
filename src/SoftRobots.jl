@@ -123,9 +123,15 @@ function normalize!(x)
 end
 
 function update_barrier!{T}(robot::SoftRobot, state::SoftRobotState{T})
+    node_is_on_face = falses(length(robot.nodes))
+    for face in robot.faces
+        for i in 1:length(face)
+            node_is_on_face[onebased(face, i)] = true
+        end
+    end
     mesh = HomogenousMesh(state.positions, robot.faces)
     normals = decompose(GeometryTypes.Normal{3, T}, mesh)
-    state.barrier = HermiteRadialField(state.positions, normals)
+    state.barrier = HermiteRadialField(state.positions[node_is_on_face], normals[node_is_on_face])
 end
 
 function update_velocity_field!{T}(robot::SoftRobot, state::SoftRobotState{T})
