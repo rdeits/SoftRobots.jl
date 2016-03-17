@@ -305,16 +305,6 @@ function blob(;k=4000., b=4.0, m=0.1, num_nodes=20)
             rest_length = norm(positions[i] - positions[j])
             push!(edges, DampedSpring(i, j, k, b, rest_length))
         end
-        # for k = 1:edges_per_node
-        #     connected_nodes = []
-        #     j = rand(1:num_nodes)
-        #     while j == i || j in connected_nodes
-        #         j = rand(1:num_nodes)
-        #     end
-        #     push!(connected_nodes, j)
-        #     rest_length = norm(positions[i] - positions[j])
-        #     push!(edges, DampedSpring(i, j, k, b, rest_length))
-        # end
     end
 
     faces = convex_hull(positions)
