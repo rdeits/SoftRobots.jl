@@ -168,7 +168,7 @@ end
 function barrier_collisions!{T}(robot::SoftRobot, my_state::SoftRobotState{T}, other_state::ObjectState, friction::Number, dt::Number)
 	barrier_graident = grad(other_state.barrier)
     for i = 1:length(robot.nodes)
-        barrier_velocity = Point(evaluate(other_state.velocity_field, my_state.positions[i])...)
+        barrier_velocity = Point{3, T}(evaluate(other_state.velocity_field, my_state.positions[i])...)
         relative_velocity = my_state.velocities[i] - barrier_velocity
         predicted_relative_position = my_state.positions[i] + relative_velocity * dt
         if evaluate(other_state.barrier, predicted_relative_position) <= 0
@@ -222,10 +222,10 @@ function update_internal_forces!{T}(robot::SoftRobot, state::SoftRobotState{T}, 
     end
 end
 
-function euler_integrate!(robot::SoftRobot, state::SoftRobotState, total_forces, dt::Real)
+function euler_integrate!{T}(robot::SoftRobot, state::SoftRobotState{T}, total_forces, dt::Real)
     dim = length(state.positions[1])
     for i = 1:length(robot.nodes)
-        delta_v = Point(total_forces[i]) / robot.nodes[i].mass * dt
+        delta_v = Point{3, T}(total_forces[i]) / robot.nodes[i].mass * dt
         # state.velocities[i] += half_delta_v
         # state.velocities[i] += Point(total_forces[i]) / robot.nodes[i].mass * dt
         state.positions[i] += state.velocities[i] * dt
@@ -269,7 +269,7 @@ function convex_hull{T}(nodes::Vector{Point{3, T}})
         v = Vector{T}[nodes[simplices[i, j]] for j in 1:size(simplices, 2)]
 
         # Given a face of a convex hull, all of the points in the body must be on the same side of that face. So in theory, we just need to pick one point not on the face and check which side it's on. But to attempt to be robust to numerical issues, we'll actually sum the dot product with the normal for every point in the body, and check whether that sum is positive or negative. If this becomes a performance bottleneck, we can revisit it later.
-        n = Point(cross(v[2] - v[1], v[3] - v[1]))
+        n = Point{3, T}(cross(v[2] - v[1], v[3] - v[1]))
         b = dot(n, nodes[simplices[i, 1]])
         total = zero(T)
         for j = 1:length(nodes)
@@ -295,7 +295,7 @@ function tetrahedron()
 
     nodes = [PointMass(m) for i in 1:4]
     edges = [DampedSpring(x, y, k, b, l) for (x, y) in Any[[1,2], [1,3], [1,4], [2,3], [2,4], [3, 4]]]
-    positions = [Point(0., 0, 0.2), Point(0.05, 0, 0.2), Point(0., 0.05, 0.2), Point(0.02, 0.02, 0.25)]
+    positions = Point{3, Float64}[[0.; 0; 0.2], [0.05; 0; 0.2], [0.; 0.05; 0.2], [0.02; 0.02; 0.25]]
     faces = convex_hull(positions)
     robot = SoftRobot(nodes, edges, faces)
     velocities = [Point{3, Float64}(0) for n in robot.nodes]
@@ -416,7 +416,7 @@ function draw(lcmgl::LCMGLClient, mesh::AbstractMesh; face_color=[.7, .7, .2, .4
       normals = decompose(Normal{3, Float64}, mesh)
       for i = 1:length(verts)
         vertex(lcmgl, verts[i]...)
-        vertex(lcmgl, (verts[i] + Point(normals[i]) * 0.05)...)
+        vertex(lcmgl, (verts[i] + Point{3, Float64}(normals[i]) * 0.05)...)
       end
     end
     end_mode(lcmgl)
