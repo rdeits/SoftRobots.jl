@@ -77,7 +77,7 @@ type SoftRobotState{T} <: DynamicObjectState
 end
 
 function SoftRobotState{T}(positions::Vector{Vector{T}}, velocities::Vector{Vector{T}})
-	SoftRobotState{T}(map(x -> convert(Point{3, T}, x), positions), map(x -> convert(Point{3, T}, x), velocities))
+    SoftRobotState{T}(map(x -> convert(Point{3, T}, x), positions), map(x -> convert(Point{3, T}, x), velocities))
 end
 
 function SoftRobotState{T}(positions::Vector{Point{3, T}}, velocities::Vector{Point{3, T}})
@@ -98,6 +98,12 @@ function update!(world::World, states::Dict{Object, ObjectState}, dt::Number)
     end
     for object in keys(states)
         collisions!(object, states, world.friction, dt)
+        if isa(object, SoftRobot)
+            if any(x -> any(isnan, x), states[object].positions)
+                @show states[object]
+                error("nans in positions after collision")
+            end
+        end
     end
     for (object, state) in states
         dynamics!(object, state, world.gravity, dt)
@@ -136,6 +142,12 @@ function update_barrier!{T}(robot::SoftRobot, state::SoftRobotState{T})
     end
     mesh = HomogenousMesh(state.positions, robot.faces)
     normals = decompose(GeometryTypes.Normal{3, T}, mesh)
+    if any(x -> any(isnan, x), normals[node_is_on_face])
+        @show robot.faces
+        @show state.positions
+        @show state.positions[node_is_on_face]
+        @show normals[node_is_on_face]
+    end
     state.barrier = HermiteRadialField(state.positions[node_is_on_face], normals[node_is_on_face])
 end
 
@@ -170,25 +182,24 @@ function rotmat(theta)
 end
 
 function barrier_collisions!{T}(robot::SoftRobot, my_state::SoftRobotState{T}, other_state::ObjectState, friction::Number, dt::Number)
-	barrier_graident = grad(other_state.barrier)
+    barrier_graident = grad(other_state.barrier)
     for i = 1:length(robot.nodes)
-        barrier_velocity = Point{3, T}(evaluate(other_state.velocity_field, my_state.positions[i])...)
-        relative_velocity = my_state.velocities[i] - barrier_velocity
-        predicted_relative_position = my_state.positions[i] + relative_velocity * dt
+        barrier_velocity::Point{3, T} = evaluate(other_state.velocity_field, my_state.positions[i])
+        relative_velocity::Point{3, T} = my_state.velocities[i] - barrier_velocity
+        predicted_relative_position::Point{3, T} = my_state.positions[i] + relative_velocity * dt
         if evaluate(other_state.barrier, predicted_relative_position) <= 0
-            # println("collision with barrier: " , other_state.barrier)
-            # @show my_state.velocities[i]
-            # @show my_state.positions[i]
-            # @show relative_velocity
-            gradient = Point{3, T}(evaluate(barrier_graident, predicted_relative_position))
-            normal = gradient / norm(gradient)
+            gradient::Point{3, T} = evaluate(barrier_graident, predicted_relative_position)
+            normal = gradient ./ norm(gradient)
+            if any(isnan, normal)
+                @show gradient
+                @show normal
+                error("nan in normal")
+            end
             penetration_velocity = -dot(relative_velocity, normal)
-            # @show penetration_velocity
             if penetration_velocity > 0
                 # my_state.velocities[i] += normal * penetration_velocity
-                my_state.velocities[i] = Point(barrier_velocity)
+                my_state.velocities[i] = barrier_velocity
             end
-            # @show my_state.velocities[i]
             # gradient = rotmat(friction * pi*(rand(1) - 0.5)) * gradient
             # normal = gradient / norm(gradient)
             # penetration_velocity = -dot(relative_velocity, normal)
@@ -293,17 +304,19 @@ function copy_dict_values(dict::Dict)
     Dict(zip(keys(dict), deepcopy(values(dict))))
 end
 
-function simulate{StateType <: WorldState}(world::World, initial_world_state::StateType, times; draw_callback::Function=(args...)->nothing)
-  state = copy_dict_values(initial_world_state)
-  history = Tuple{Float64, StateType}[]
-  dts = diff(times)
+function simulate{StateType <: WorldState}(world::World, initial_world_state::StateType, times; draw_callback::Function=(args...)->nothing, history_downsampling=1)
+    state = copy_dict_values(initial_world_state)
+    history = Tuple{Float64, StateType}[]
+    dts = diff(times)
 
-  for i in 2:length(times)
-    SoftRobots.update!(world, state, times[i] - times[i-1])
-    push!(history, (times[i], copy_dict_values(state)))
-    draw_callback(world, state)
-  end
-  history
+    for i in 2:length(times)
+        SoftRobots.update!(world, state, times[i] - times[i-1])
+        if mod(i, history_downsampling) == 0
+            push!(history, (times[i], copy_dict_values(state)))
+        end
+        draw_callback(world, state)
+    end
+    history
 end
 
 include("robots.jl")
