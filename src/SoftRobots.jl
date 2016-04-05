@@ -1,5 +1,3 @@
-VERSION >= v"0.4" && __precompile__()
-
 module SoftRobots
 
 import DataStructures: OrderedDict
@@ -283,7 +281,7 @@ function barrier_mesh(bounds::HyperRectangle, barrier::ScalarField)
     ub = maximum(bounds)
     lb = minimum(bounds)
     widths = maximum(bounds) - minimum(bounds)
-    barrier_field = SignedDistanceField(x -> SoftRobots.evaluate(barrier, x), bounds, maximum(widths)/10);
+    barrier_field = SignedDistanceField(x -> SoftRobots.evaluate(barrier, x), bounds, maximum(widths)/20);
     barrier_mesh = HomogenousMesh(barrier_field, 0.0)
     rescaled_points = Point{3,Float64}[Vec(v-1) ./ (Vec(size(barrier_field))-1) .* (ub - lb) + lb for v in vertices(barrier_mesh)]
      HomogenousMesh(rescaled_points, barrier_mesh.faces)

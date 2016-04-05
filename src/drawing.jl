@@ -46,16 +46,16 @@ end
 
 function link_data_list(robot::FixedObject, state::FixedObjectState, robot_num::Integer=1)
     lb = Vec(-1., -1, -1)
-    ub = Vec(1., 1, 1)
+    ub = Vec(1.5, 1.5, 1.5)
     widths = ub - lb
     bounds = HyperRectangle(lb, widths)
     mesh = barrier_mesh(bounds, state.barrier)
-    [link_data(mesh, "barrier", robot_num, color=[0;1;0;0.5])]
+    [link_data(mesh, "barrier", robot_num, color=[0;1;0;0.2])]
 end
 
 function link_data_list(robot::SoftRobot, state::SoftRobotState, robot_num::Integer=1)
     [link_data(HomogenousMesh(state.positions, robot.faces), "body", robot_num, color=[1;1;0;0.5])
-     link_data(barrier_mesh(robot, state), "barrier", robot_num, color=[1;1;0;0.2])]
+     link_data(barrier_mesh(robot, state), "barrier", robot_num, color=[1;0;0;0.2])]
  end
 
 function draw(lcm::PyLCM.PyLCMWrapper, world, world_state)
