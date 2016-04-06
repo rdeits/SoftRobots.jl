@@ -55,7 +55,7 @@ end
 
 function link_data_list(robot::SoftRobot, state::SoftRobotState, robot_num::Integer=1)
     [link_data(HomogenousMesh(state.positions, robot.faces), "body", robot_num, color=[1;1;0;0.5])
-     link_data(barrier_mesh(robot, state), "barrier", robot_num, color=[1;0;0;0.2])]
+     link_data(barrier_mesh(state), "barrier", robot_num, color=[1;0;0;0.2])]
  end
 
 function draw(lcm::PyLCM.LCM, world, world_state)
@@ -72,3 +72,12 @@ function draw(world, world_state)
     draw(lcm, world, world_state)
     finalize(lcm)
 end
+
+function draw{T}(robot, state::SoftRobotState{T})
+    world = World3D()
+    update_barrier!(robot, state)
+    push!(world.objects, robot)
+    world_state = Dict(robot => state)
+    draw(world, world_state)
+end
+

@@ -146,7 +146,11 @@ function update_barrier!{T}(robot::SoftRobot, state::SoftRobotState{T})
         @show state.positions[node_is_on_face]
         @show normals[node_is_on_face]
     end
-    state.barrier = HermiteRadialField(state.positions[node_is_on_face], normals[node_is_on_face])
+    # state.barrier = HermiteRadialField(state.positions[node_is_on_face], normals[node_is_on_face])
+    values = zeros(length(state.positions))
+    values[!node_is_on_face] = -1.0 
+    state.barrier = InterpolatingSurface(state.positions, values, SpatialFields.TwiceDifferentiableFunction(x -> x^2 * log(x)))
+    # state.barrier = InterpolatingSurface(state.positions, values)
 end
 
 function update_velocity_field!{T}(robot::SoftRobot, state::SoftRobotState{T})
@@ -273,28 +277,36 @@ function convex_hull{T}(nodes::Vector{Point{3, T}})
     end
     return faces
 end
-# function mesh{T}(robot::SoftRobot, state::SoftRobotState{T})
-#     HomogenousMesh(state.positions, robot.faces)
-# end
 
 function barrier_mesh(bounds::HyperRectangle, barrier::ScalarField)
     ub = maximum(bounds)
     lb = minimum(bounds)
     widths = maximum(bounds) - minimum(bounds)
-    barrier_field = SignedDistanceField(x -> SoftRobots.evaluate(barrier, x), bounds, maximum(widths)/20);
+    barrier_field = SignedDistanceField(x -> SoftRobots.evaluate(barrier, x), bounds, minimum(widths)/20);
     barrier_mesh = HomogenousMesh(barrier_field, 0.0)
     rescaled_points = Point{3,Float64}[Vec(v-1) ./ (Vec(size(barrier_field))-1) .* (ub - lb) + lb for v in vertices(barrier_mesh)]
      HomogenousMesh(rescaled_points, barrier_mesh.faces)
  end
 
-function barrier_mesh(robot::SoftRobot, state::SoftRobotState)
-    center = Vec(mean(state.positions))
-    widths = Vec(2*(maximum(state.positions) - minimum(state.positions)))
+ function barrier_mesh(field::HermiteRadialField)
+    center = Vec(mean(field.points))
+    widths = Vec(2*(maximum(field.points) - minimum(field.points)))
     lb = Vec(center - 0.5*widths)
     ub = Vec(center + 0.5*widths)
     bounds = HyperRectangle(lb, widths)
-    barrier_mesh(bounds, state.barrier)
+    barrier_mesh(bounds, field)
 end
+
+function barrier_mesh(field::InterpolatingSurface)
+    center = Vec(mean(field.points))
+    widths = Vec(2*(maximum(field.points) - minimum(field.points)))
+    lb = Vec(center - 0.5*widths)
+    ub = Vec(center + 0.5*widths)
+    bounds = HyperRectangle(lb, widths)
+    barrier_mesh(bounds, field)
+end
+
+barrier_mesh(state::SoftRobotState) = barrier_mesh(state.barrier)
 
 include("drawing.jl")
 
