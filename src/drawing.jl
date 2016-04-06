@@ -58,7 +58,7 @@ function link_data_list(robot::SoftRobot, state::SoftRobotState, robot_num::Inte
      link_data(barrier_mesh(robot, state), "barrier", robot_num, color=[1;0;0;0.2])]
  end
 
-function draw(lcm::PyLCM.PyLCMWrapper, world, world_state)
+function draw(lcm::PyLCM.LCM, world, world_state)
     msg = lcmdrake[:lcmt_viewer_load_robot]()
     for (i, robot) in enumerate(world.objects)
         append!(msg["link"], link_data_list(robot, world_state[robot], i))
