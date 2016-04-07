@@ -149,7 +149,7 @@ function update_barrier!{T}(robot::SoftRobot, state::SoftRobotState{T})
     # state.barrier = HermiteRadialField(state.positions[node_is_on_face], normals[node_is_on_face])
     values = zeros(length(state.positions))
     values[!node_is_on_face] = -1.0 
-    state.barrier = InterpolatingSurface(state.positions, values, SpatialFields.TwiceDifferentiableFunction(x -> x^2 * log(x)))
+    state.barrier = InterpolatingSurface(state.positions, values, SpatialFields.XSquaredLogX())
     # state.barrier = InterpolatingSurface(state.positions, values)
 end
 
