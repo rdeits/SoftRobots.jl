@@ -1,21 +1,21 @@
 function convert{N, T, PointType}(::Type{Array{T, 2}}, points::Vector{Point{N, PointType}})
-	A = Array{T}(N, length(points))
-	for i = 1:N
-		for j = 1:length(points)
-			A[i,j] = points[j][i]
-		end
-	end
-	A
+    A = Array{T}(N, length(points))
+    for i = 1:N
+        for j = 1:length(points)
+            A[i,j] = points[j][i]
+        end
+    end
+    A
 end
 
 function convert{N, T, FaceType, Offset}(::Type{Array{T, 2}}, faces::Vector{GeometryTypes.Face{N, FaceType, Offset}})
     A = Array{T}(N, length(faces))
-	for i = 1:N
+    for i = 1:N
         for j = 1:length(faces)
             A[i,j] = faces[j][i]
-		end
-	end
-	A
+        end
+    end
+    A
 end
 
 
