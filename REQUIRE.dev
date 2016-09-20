@@ -9,5 +9,7 @@ FixedSizeArrays
 ProfileView
 GeometryTypes
 LCMGL
+MathProgBase
+Ipopt
 
 git@github.com:rdeits/SpatialFields.jl.git 8ac7d2a13b7916486de518fd7e821d4fbe4ce7a5
