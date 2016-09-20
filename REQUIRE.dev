@@ -1,0 +1,13 @@
+julia 0.4
+MultiPoly
+PyCall
+PyPlot
+PyLCM 0.0.3
+IJulia 1.3.1
+ForwardDiff 0.2.5
+FixedSizeArrays
+ProfileView
+GeometryTypes
+LCMGL
+
+git@github.com:rdeits/SpatialFields.jl.git 8ac7d2a13b7916486de518fd7e821d4fbe4ce7a5
